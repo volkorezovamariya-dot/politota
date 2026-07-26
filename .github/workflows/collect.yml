@@ -31,7 +31,7 @@ jobs:
       - name: Прогон сборщика
         run: python collect_events.py
 
-      - name: Пять чисел в отчёт
+      - name: Числа в отчёт
         if: always()
         run: |
           if [ ! -f data/manifest.json ]; then
@@ -40,7 +40,7 @@ jobs:
             exit 0
           fi
           python - <<'PY' >> $GITHUB_STEP_SUMMARY
-          import json, csv, pathlib
+          import json, csv
           m = json.load(open("data/manifest.json"))
           rows = list(csv.DictReader(open("data/events_candidates.csv", encoding="utf-8")))
           print("### Результат прогона\n")
@@ -48,7 +48,7 @@ jobs:
           print("|---|---:|")
           print(f"| Правил BIS выгружено | {m['n_rules_harvested']} |")
           print(f"| Кандидатов после фильтра | {m['n_candidates']} |")
-          print(f"| Строк в выборке на проверку | {m['n_review_sample']} |")
+          print(f"| Строк на ручную проверку | {m['n_review_sample']} |")
           print(f"| Период | {m['experiment']['history_start']} → сегодня |")
           print(f"| resolution_version | {m['resolution_version']} |")
           print(f"| script_sha256 | `{m['environment']['script_sha256'][:16]}…` |")
@@ -56,13 +56,15 @@ jobs:
           if rows:
               g = [r for r in rows if str(r.get("n_entities_guess", "")).strip() not in ("", "0")]
               s4 = [r for r in rows if r.get("mentions_supplement_4") == "True"]
-              print("\n### Проверка предсказаний\n")
-              print(f"- Кандидатов с непустым `n_entities_guess`: **{len(g)}/{len(rows)}** "
-                    f"— предсказание было, что регулярка почти всегда даст 0 или мусор")
-              print(f"- Кандидатов, где текст упоминает Supplement No. 4: **{len(s4)}/{len(rows)}** "
-                    f"— грубая верхняя оценка доли настоящих событий")
-              print("\nДоля ложных кандидатов считается ТОЛЬКО вручную по `review_sample.csv`. "
-                    "Цифры выше — индикаторы, не разметка.")
+              pi = [int(r["pi_lead_days"]) for r in rows if str(r.get("pi_lead_days", "")).strip()]
+              print("\n### Диагностические индикаторы\n")
+              print(f"- Непустой `n_entities_guess`: **{len(g)}/{len(rows)}**")
+              print(f"- Упоминание Supplement No. 4: **{len(s4)}/{len(rows)}**")
+              if pi:
+                  pi.sort()
+                  med = pi[len(pi)//2] if len(pi) % 2 else (pi[len(pi)//2-1] + pi[len(pi)//2]) / 2
+                  print(f"- PI-дата получена: **{len(pi)}/{len(rows)}**, медианная фора: **{med} дней**")
+              print("\nДоля ложных кандидатов считается только ручной разметкой.")
           PY
 
       - name: Выгрузка артефактов
@@ -70,6 +72,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: politota-candidates-${{ inputs.history_start }}
-          path: data/
+          path: |
+            data/manifest.json
+            data/events_candidates.csv
+            data/review_sample.csv
           if-no-files-found: warn
           retention-days: 30
