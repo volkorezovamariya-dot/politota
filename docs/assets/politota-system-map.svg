@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="820" viewBox="0 0 1400 820" role="img" aria-labelledby="title desc">
+  <title id="title">POLITOTA system map</title>
+  <desc id="desc">Visual architecture of signals, engines, country state and scenario forecasts.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0c1220"/>
+      <stop offset="1" stop-color="#18253c"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-opacity="0.28"/>
+    </filter>
+    <style>
+      .title{font:700 44px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;fill:#f8fafc}
+      .sub{font:400 20px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;fill:#a9b8cc}
+      .head{font:700 22px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;fill:#f8fafc}
+      .text{font:400 17px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;fill:#d7e0eb}
+      .small{font:500 15px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;fill:#a9b8cc}
+      .card{fill:#17243a;stroke:#344968;stroke-width:1.5;rx:22;filter:url(#shadow)}
+      .core{fill:#25395b;stroke:#7da6e8;stroke-width:2;rx:28;filter:url(#shadow)}
+      .arrow{stroke:#6f8fb9;stroke-width:3;fill:none;marker-end:url(#m)}
+    </style>
+    <marker id="m" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0 0L12 6L0 12Z" fill="#6f8fb9"/></marker>
+  </defs>
+  <rect width="1400" height="820" fill="url(#bg)"/>
+  <text x="70" y="76" class="title">POLITOTA</text>
+  <text x="70" y="110" class="sub">Global Decision &amp; Scenario System · актуальный контур MVP</text>
+
+  <rect x="65" y="170" width="285" height="510" class="card"/>
+  <text x="95" y="215" class="head">1. Сигналы</text>
+  <text x="95" y="258" class="text">Новости и заявления</text>
+  <text x="95" y="294" class="text">Госзакупки и CAPEX</text>
+  <text x="95" y="330" class="text">Цены и потребление</text>
+  <text x="95" y="366" class="text">Бизнес и занятость</text>
+  <text x="95" y="402" class="text">Торговля и логистика</text>
+  <text x="95" y="438" class="text">Финансы и технологии</text>
+  <text x="95" y="474" class="text">Соцсети и нарративы</text>
+  <text x="95" y="530" class="small">Каждый сигнал:</text>
+  <text x="95" y="562" class="small">источник · дата · качество</text>
+  <text x="95" y="590" class="small">факт · интерпретация</text>
+  <text x="95" y="618" class="small">impact · confidence</text>
+
+  <rect x="435" y="170" width="380" height="510" class="core"/>
+  <text x="475" y="215" class="head">2. Аналитические движки</text>
+  <rect x="475" y="250" width="300" height="58" rx="14" fill="#182942"/><text x="500" y="286" class="text">Country State Engine</text>
+  <rect x="475" y="324" width="300" height="58" rx="14" fill="#182942"/><text x="500" y="360" class="text">Material Reality Engine</text>
+  <rect x="475" y="398" width="300" height="58" rx="14" fill="#182942"/><text x="500" y="434" class="text">Domestic Pulse Engine</text>
+  <rect x="475" y="472" width="300" height="58" rx="14" fill="#182942"/><text x="500" y="508" class="text">Procurement Intent Engine</text>
+  <rect x="475" y="546" width="300" height="58" rx="14" fill="#182942"/><text x="500" y="582" class="text">Narrative &amp; Chaos Engines</text>
+  <text x="475" y="642" class="small">Объяснимые веса · конкурирующие гипотезы</text>
+
+  <rect x="900" y="170" width="435" height="230" class="card"/>
+  <text x="940" y="215" class="head">3. Состояние страны</text>
+  <text x="940" y="258" class="text">Экономика · общество · институты</text>
+  <text x="940" y="294" class="text">материальная готовность · устойчивость</text>
+  <text x="940" y="330" class="text">разрыв риторики и реальных действий</text>
+  <text x="940" y="366" class="small">Текущее значение · тренд · скорость · инерция</text>
+
+  <rect x="900" y="450" width="435" height="230" class="card"/>
+  <text x="940" y="495" class="head">4. Сценарии и решения</text>
+  <text x="940" y="538" class="text">Вероятность решения на 7 / 30 / 90 дней</text>
+  <text x="940" y="574" class="text">драйверы за и против · точки слома</text>
+  <text x="940" y="610" class="text">альтернативные сценарии · новые свидетельства</text>
+  <text x="940" y="646" class="small">Не «истинное будущее», а обновляемая оценка</text>
+
+  <path d="M350 425 C390 425 395 425 435 425" class="arrow"/>
+  <path d="M815 330 C855 330 860 285 900 285" class="arrow"/>
+  <path d="M1118 400 L1118 450" class="arrow"/>
+
+  <text x="70" y="760" class="small">Версия схемы: 2026-07-26 · Sprint 0 · синтетические данные для проверки интерфейса</text>
+</svg>
