@@ -6,16 +6,7 @@ POLITOTA — диагностика провала в конце периода.
 26 июля 2026 — 192 дня без единого кандидата, при средней частоте примерно
 1,4 кандидата в месяц на предыдущих 24 месяцах.
 
-Две конкурирующие гипотезы:
-
-  H_real     — BIS действительно не публиковал подходящих правил полгода.
-               Тогда это резкий сдвиг режима, и он критически влияет на
-               базовую ставку: любое окно в 2026 году получит нулевой исход.
-
-  H_artifact — выгрузка обрывается. Тогда под вопросом ВСЯ выборка,
-               а не только хвост.
-
-Скрипт их разделяет. Ничего не пишет на диск, только печатает.
+Диагностика ничего не пишет на диск, только печатает.
 """
 
 import sys
@@ -26,7 +17,14 @@ import requests
 
 API = "https://www.federalregister.gov/api/v1"
 GAP_START = "2026-01-01"
-FIELDS = ["document_number", "title", "publication_date", "cfr_references", "type"]
+FIELDS = [
+    "document_number",
+    "title",
+    "publication_date",
+    "cfr_references",
+    "type",
+    "raw_text_url",
+]
 
 
 def get(params):
@@ -46,7 +44,7 @@ def main():
     )
     print(f"слаг BIS: {slug}\n")
 
-    # Проверка 1. Есть ли У BIS вообще правила после GAP_START?
+    # [1] RULE BIS после начала разрыва.
     docs = get(
         [("conditions[agencies][]", slug),
          ("conditions[type][]", "RULE"),
@@ -63,14 +61,9 @@ def main():
         mark = "744!" if "744" in parts else "    "
         print(f"    {mark} {d['publication_date']}  {d['title'][:78]}")
 
-    if not docs:
-        print("\n    ⚠ Ноль правил BIS за полгода — это само по себе аномально.")
-        print("      Подозрение смещается на H_artifact: проверить фильтр по типу")
-        print("      документа (может, действия ушли в PRORULE или NOTICE).")
-
     time.sleep(0.4)
 
-    # Проверка 2. Контроль без фильтра по агентству — жив ли вообще API на этих датах.
+    # [2] Контроль свежести API без фильтра по агентству.
     ctrl = get(
         [("conditions[type][]", "RULE"),
          ("conditions[publication_date][gte]", GAP_START),
@@ -84,27 +77,50 @@ def main():
 
     time.sleep(0.4)
 
-    # Проверка 3. Все типы документов BIS за провал — не переехали ли действия.
+    # [3] Все типы документов BIS.
     allt = get(
         [("conditions[agencies][]", slug),
          ("conditions[publication_date][gte]", GAP_START),
-         ("per_page", "1000"), ("order", "oldest"),
-         ("fields[]", "type"), ("fields[]", "title"), ("fields[]", "publication_date")]
+         ("per_page", "1000"), ("order", "oldest")]
+        + [("fields[]", f) for f in FIELDS]
     )
     print(f"\n[3] документы BIS всех типов с {GAP_START}: {len(allt)}")
     for k, v in Counter(d.get("type") for d in allt).most_common():
         print(f"    {k}: {v}")
 
+    # [4] Точечная проверка смены типа документа.
+    relevant = []
+    for d in allt:
+        parts = {
+            str(x.get("part")) for x in (d.get("cfr_references") or [])
+            if str(x.get("title")) == "15"
+        }
+        title = d.get("title") or ""
+        by_title = "entity list" in title.lower()
+        by_cfr = "744" in parts
+        if by_title or by_cfr:
+            relevant.append((d, by_cfr, by_title))
+
+    print(
+        f"\n[4] документы BIS всех типов с CFR 744 и/или "
+        f"'Entity List' в заголовке: {len(relevant)}"
+    )
+    for d, by_cfr, by_title in relevant:
+        marks = ",".join(
+            x for x, ok in (("744", by_cfr), ("TITLE", by_title)) if ok
+        )
+        print(
+            f"    {d.get('type','?'):7} {d['publication_date']} "
+            f"[{marks:9}] {d['title'][:90]}"
+        )
+
     print("\n" + "=" * 62)
     print("ЧТЕНИЕ РЕЗУЛЬТАТА")
-    print("  [1] > 0 и есть строки с 744  → H_artifact: ломается наш фильтр")
-    print("  [1] > 0, но 744 нигде нет    → H_real: BIS не трогал Entity List")
-    print("  [1] = 0, а [3] > 0           → действия сменили тип документа")
-    print("  [1] = 0 и [3] = 0, [2] > 0   → BIS молчал полгода. Проверить руками")
-    print("  [2] = 0                      → проблема в API или в запросе, не в BIS")
+    print("  [4] содержит NOTICE после 2026-01-15 → действия могли сменить тип документа")
+    print("  [4] после 2026-01-15 пуст            → свидетельство в пользу реального замедления")
+    print("  [2] = 0                              → проблема в API или запросе")
     print("=" * 62)
-    print("\nЛюбой исход фиксируется в docs/decisions/ — это первое")
-    print("столкновение выборки с реальностью, и оно должно остаться в истории.")
+    print("\nДо результата [4] решение в docs/decisions/ не фиксируется.")
 
 
 if __name__ == "__main__":
