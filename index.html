@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Politota — ранние сигналы</title>
+  <meta name="description" content="Прототип аналитической системы раннего обнаружения политических и социально-экономических изменений." />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">POLITOTA / SIGNAL INTELLIGENCE</p>
+      <h1>Карта ранних сигналов</h1>
+    </div>
+    <div class="status"><span class="status-dot"></span> Sprint 0 prototype</div>
+  </header>
+
+  <main class="layout">
+    <aside class="panel filters">
+      <h2>Фильтры</h2>
+      <label>Страна<select id="countryFilter"><option value="all">Все страны</option></select></label>
+      <label>Категория<select id="categoryFilter"><option value="all">Все категории</option></select></label>
+      <label>Минимальная уверенность<input id="confidenceFilter" type="range" min="0" max="100" value="0" /><span id="confidenceValue">0%</span></label>
+      <button id="resetFilters" type="button">Сбросить</button>
+      <p class="note">Данные демонстрационные. Интерфейс проверяет модель, а не описывает реальную ситуацию.</p>
+    </aside>
+
+    <section class="content">
+      <section class="metrics" aria-label="Сводные показатели">
+        <article class="metric"><span>Сигналов</span><strong id="signalCount">—</strong></article>
+        <article class="metric"><span>Стран</span><strong id="countryCount">—</strong></article>
+        <article class="metric"><span>Средний риск</span><strong id="averageRisk">—</strong></article>
+        <article class="metric"><span>Высокий приоритет</span><strong id="highPriorityCount">—</strong></article>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <div><p class="eyebrow">COUNTRY WATCH</p><h2>Страны под наблюдением</h2></div>
+          <span id="updatedAt" class="muted"></span>
+        </div>
+        <div id="countryCards" class="country-grid"></div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading"><div><p class="eyebrow">SIGNAL FEED</p><h2>Лента сигналов</h2></div><span id="visibleCount" class="muted"></span></div>
+        <div id="signalFeed" class="signal-feed"></div>
+      </section>
+    </section>
+  </main>
+
+  <template id="emptyState"><div class="empty">По выбранным фильтрам сигналов нет.</div></template>
+  <script src="app.js" defer></script>
+</body>
+</html>
