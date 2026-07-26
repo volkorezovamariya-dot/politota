@@ -7,11 +7,19 @@ on:
         description: "Начало периода (дымовой прогон: 2024-01-01)"
         required: true
         default: "2024-01-01"
+  push:
+    branches:
+      - sprint-0/foundation
+    paths:
+      - collect_events.py
+      - .github/workflows/collect.yml
 
 jobs:
   collect:
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    env:
+      HISTORY_START_INPUT: ${{ github.event.inputs.history_start || '2024-01-01' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -25,7 +33,7 @@ jobs:
 
       - name: Подстановка периода
         run: |
-          sed -i 's|^HISTORY_START = .*|HISTORY_START = "${{ inputs.history_start }}"  # задан через workflow_dispatch|' collect_events.py
+          sed -i "s|^HISTORY_START = .*|HISTORY_START = \"${HISTORY_START_INPUT}\"  # задан workflow|" collect_events.py
           grep -n '^HISTORY_START' collect_events.py
 
       - name: Прогон сборщика
@@ -71,10 +79,10 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: politota-candidates-${{ inputs.history_start }}
+          name: politota-candidates-${{ env.HISTORY_START_INPUT }}
           path: |
-            data/manifest.json
             data/events_candidates.csv
             data/review_sample.csv
+            data/manifest.json
           if-no-files-found: warn
           retention-days: 30
