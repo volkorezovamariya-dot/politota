@@ -1,0 +1,75 @@
+name: POLITOTA — сбор кандидатов
+
+on:
+  workflow_dispatch:
+    inputs:
+      history_start:
+        description: "Начало периода (дымовой прогон: 2024-01-01)"
+        required: true
+        default: "2024-01-01"
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Установка зависимостей
+        run: pip install requests
+
+      - name: Подстановка периода
+        run: |
+          sed -i 's|^HISTORY_START = .*|HISTORY_START = "${{ inputs.history_start }}"  # задан через workflow_dispatch|' collect_events.py
+          grep -n '^HISTORY_START' collect_events.py
+
+      - name: Прогон сборщика
+        run: python collect_events.py
+
+      - name: Пять чисел в отчёт
+        if: always()
+        run: |
+          if [ ! -f data/manifest.json ]; then
+            echo "### Прогон не дошёл до манифеста" >> $GITHUB_STEP_SUMMARY
+            echo "Файлов с данными не создано. Смотреть лог шага «Прогон сборщика»." >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+          python - <<'PY' >> $GITHUB_STEP_SUMMARY
+          import json, csv, pathlib
+          m = json.load(open("data/manifest.json"))
+          rows = list(csv.DictReader(open("data/events_candidates.csv", encoding="utf-8")))
+          print("### Результат прогона\n")
+          print("| Показатель | Значение |")
+          print("|---|---:|")
+          print(f"| Правил BIS выгружено | {m['n_rules_harvested']} |")
+          print(f"| Кандидатов после фильтра | {m['n_candidates']} |")
+          print(f"| Строк в выборке на проверку | {m['n_review_sample']} |")
+          print(f"| Период | {m['experiment']['history_start']} → сегодня |")
+          print(f"| resolution_version | {m['resolution_version']} |")
+          print(f"| script_sha256 | `{m['environment']['script_sha256'][:16]}…` |")
+          print(f"| seed | {m['environment']['review_seed']} |")
+          if rows:
+              g = [r for r in rows if str(r.get("n_entities_guess", "")).strip() not in ("", "0")]
+              s4 = [r for r in rows if r.get("mentions_supplement_4") == "True"]
+              print("\n### Проверка предсказаний\n")
+              print(f"- Кандидатов с непустым `n_entities_guess`: **{len(g)}/{len(rows)}** "
+                    f"— предсказание было, что регулярка почти всегда даст 0 или мусор")
+              print(f"- Кандидатов, где текст упоминает Supplement No. 4: **{len(s4)}/{len(rows)}** "
+                    f"— грубая верхняя оценка доли настоящих событий")
+              print("\nДоля ложных кандидатов считается ТОЛЬКО вручную по `review_sample.csv`. "
+                    "Цифры выше — индикаторы, не разметка.")
+          PY
+
+      - name: Выгрузка артефактов
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: politota-candidates-${{ inputs.history_start }}
+          path: data/
+          if-no-files-found: warn
+          retention-days: 30
