@@ -1,0 +1,28 @@
+name: POLITOTA — диагностика разрыва
+
+on:
+  push:
+    branches:
+      - sprint-0/foundation
+    paths:
+      - diagnose_gap.py
+      - .github/workflows/diagnose-gap.yml
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Установка зависимостей
+        run: pip install requests
+
+      - name: Диагностика 192-дневного разрыва
+        run: python diagnose_gap.py
