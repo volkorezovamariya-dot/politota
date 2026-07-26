@@ -32,50 +32,31 @@ from pathlib import Path
 
 import requests
 
-# ─────────────────────────────────────────────────────────────────────────────
-# ARCHITECTURE — развилки раздела 12 протокола. ЗАМОРОЖЕНЫ после решения
-# архитектора. Изменение любого значения = новая версия критерия разрешения
-# и полная пересборка выборки (раздел 0). Значения ниже = рекомендации аудита.
-# ─────────────────────────────────────────────────────────────────────────────
+EVENT_FAMILY = "entity_list"
+HORIZON_DAYS = 30
+UNIT_OF_OBSERVATION = "rule"
+INCLUDE_HK_MACAU = True
+TARGET_TYPE = "binary"
+REGIME_INTERACTIONS = False
+USE_COST_MATRIX = False
 
-EVENT_FAMILY = "entity_list"        # Развилка 1. Только одно семейство.
-HORIZON_DAYS = 30                    # Развилка 2. Используется на этапе сетки.
-UNIT_OF_OBSERVATION = "rule"         # Развилка 3. Единица — правило, не организация.
-INCLUDE_HK_MACAU = True              # Развилка 4.
-TARGET_TYPE = "binary"               # Развилка 6. n_entities — атрибут, не цель.
-REGIME_INTERACTIONS = False          # Развилка 7.
-USE_COST_MATRIX = False              # Развилка 8.
-
-# ─────────────────────────────────────────────────────────────────────────────
-# EXPERIMENT — параметры прогона. НЕ заморожены. Меняются свободно,
-# фиксируются в manifest.json. Смена значения здесь не является изменением
-# архитектурного решения и не требует записи в docs/decisions/.
-# ─────────────────────────────────────────────────────────────────────────────
-
-HISTORY_START = "2014-01-01"         # Развилка 5. Для дымового прогона: "2024-01-01"
-AGGREGATE_SAME_DAY = True            # Раздел 5. Второй прогон — со значением False
-                                     # (обязательная проверка чувствительности).
-
-# ─────────────────────────────────────────────────────────────────────────────
-# RUN — техническое.
-# ─────────────────────────────────────────────────────────────────────────────
+HISTORY_START = "2014-01-01"
+AGGREGATE_SAME_DAY = True
 
 RESOLUTION_VERSION = "0.4"
 DATASET_VERSION = "0.1"
-
-REVIEW_SAMPLE_SIZE = 30              # раздел 13, п. 8: не менее 20
-REVIEW_SEED = 20260726               # раздел 16.2: seed фиксируется всегда
+REVIEW_SAMPLE_SIZE = 30
+REVIEW_SEED = 20260726
 
 OUT_DIR = Path("data")
 API = "https://www.federalregister.gov/api/v1"
-PAUSE = 0.34                         # вежливость к публичному API
+PAUSE = 0.34
 
-# Администрации США — для поля policy_regime (раздел 9.5).
 REGIMES = [
-    ("obama_2",  date(2013, 1, 20), date(2017, 1, 20)),
-    ("trump_1",  date(2017, 1, 20), date(2021, 1, 20)),
-    ("biden",    date(2021, 1, 20), date(2025, 1, 20)),
-    ("trump_2",  date(2025, 1, 20), date(2100, 1, 1)),
+    ("obama_2", date(2013, 1, 20), date(2017, 1, 20)),
+    ("trump_1", date(2017, 1, 20), date(2021, 1, 20)),
+    ("biden", date(2021, 1, 20), date(2025, 1, 20)),
+    ("trump_2", date(2025, 1, 20), date(2100, 1, 1)),
 ]
 
 CN_PATTERNS = [
@@ -83,7 +64,6 @@ CN_PATTERNS = [
     (r"\bhong\s*kong\b", "Hong Kong"),
     (r"\bmacau\b|\bmacao\b", "Macau"),
 ]
-
 ADD_MARKERS = [r"\badding\b", r"\bis amended by adding\b", r"\bare added\b"]
 REMOVE_MARKERS = [r"\bremoving\b", r"\bis amended by removing\b", r"\bare removed\b"]
 
@@ -136,7 +116,6 @@ def harvest(slug):
             ("page", str(page)),
             ("order", "oldest"),
         ] + [("fields[]", f) for f in FIELDS]
-
         r = requests.get(f"{API}/documents.json", params=params, timeout=120)
         if r.status_code == 400:
             break
@@ -191,6 +170,22 @@ def inspect_text(txt):
     }
 
 
+def fetch_pi_date(document_number):
+    try:
+        r = requests.get(
+            f"{API}/public-inspection-documents/{document_number}.json",
+            timeout=60,
+        )
+        if r.status_code == 404:
+            return "", "not_on_pi"
+        r.raise_for_status()
+        j = r.json()
+        filed = j.get("filed_at") or ""
+        return (filed[:10] if filed else ""), ("ok" if filed else "no_filed_at")
+    except requests.RequestException as e:
+        return "", f"error:{type(e).__name__}"
+
+
 def regime_for(d):
     for name, lo, hi in REGIMES:
         if lo <= d < hi:
@@ -211,32 +206,42 @@ def env_fingerprint():
 def write_review_sample(rows):
     if not rows:
         return []
-
     strata = defaultdict(list)
     for r in rows:
         strata[(r["policy_regime"], r["candidate_date"][:4])].append(r)
-
     rng = random.Random(REVIEW_SEED)
     sample, keys = [], sorted(strata)
+    if len(rows) <= 50:
+        sample = list(rows)
+        rng.shuffle(sample)
+        path = OUT_DIR / "review_sample.csv"
+        with path.open("w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+            w.writeheader()
+            w.writerows(sample)
+        print(f"[✓] {path} — все {len(sample)} строк дымового прогона")
+        return sample
     for k in keys:
         sample.append(rng.choice(strata[k]))
-
     remaining = [r for r in rows if r not in sample]
     rng.shuffle(remaining)
-    sample += remaining[: max(0, REVIEW_SAMPLE_SIZE - len(sample))]
-
+    sample += remaining[:max(0, REVIEW_SAMPLE_SIZE - len(sample))]
     path = OUT_DIR / "review_sample.csv"
     with path.open("w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
         w.writeheader()
         w.writerows(sample)
-
     print(f"[✓] {path} — {len(sample)} строк из {len(keys)} страт")
     return sample
 
 
 def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
+    for name in ("events_candidates.csv", "review_sample.csv", "manifest.json"):
+        stale = OUT_DIR / name
+        if stale.exists():
+            stale.unlink()
+
     slug = resolve_bis_slug()
     docs = harvest(slug)
     print(f"[1] всего правил BIS с {HISTORY_START}: {len(docs)}")
@@ -248,20 +253,27 @@ def main():
             continue
         if d.get("correction_of"):
             continue
-
         print(f"[2] {i}/{len(docs)} {d['document_number']} ({reason})")
         obs = inspect_text(fetch_text(d.get("raw_text_url")))
         time.sleep(PAUSE)
-
         if not obs["countries_mentioned"]:
             continue
-
+        pi_date, pi_status = fetch_pi_date(d["document_number"])
+        time.sleep(PAUSE)
         pub = datetime.strptime(d["publication_date"], "%Y-%m-%d").date()
-
+        disclosure = pi_date or d["publication_date"]
         rows.append({
-            "candidate_date": d["publication_date"],
+            "disclosure_date": disclosure,
+            "publication_date": d["publication_date"],
+            "pi_filed_at": pi_date,
+            "pi_status": pi_status,
+            "pi_lead_days": (
+                (pub - datetime.strptime(pi_date, "%Y-%m-%d").date()).days
+                if pi_date else ""
+            ),
+            "candidate_date": disclosure,
             "event_family": EVENT_FAMILY,
-            "policy_regime": regime_for(pub),
+            "policy_regime": regime_for(datetime.strptime(disclosure, "%Y-%m-%d").date()),
             "document_number": d["document_number"],
             "citation": d.get("citation") or "",
             "title": (d.get("title") or "")[:300],
@@ -283,9 +295,7 @@ def main():
         w = csv.DictWriter(f, fieldnames=list(rows[0].keys()) if rows else ["empty"])
         w.writeheader()
         w.writerows(rows)
-
     review = write_review_sample(rows)
-
     manifest = {
         "generated_at": datetime.utcnow().isoformat() + "Z",
         "resolution_version": RESOLUTION_VERSION,
@@ -316,12 +326,8 @@ def main():
     (OUT_DIR / "manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
     )
-
     print(f"\n[✓] {path} — {len(rows)} кандидатов")
     print("[!] Это очередь проверки, а не выборка событий.")
-    print("[!] Дальше: разметить вручную data/review_sample.csv (случайная,")
-    print("    стратифицированная выборка), затем остальные MANUAL_*,")
-    print("    затем агрегировать по дате → data/events.csv")
 
 
 if __name__ == "__main__":
